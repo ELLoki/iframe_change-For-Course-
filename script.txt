@@ -1,0 +1,1285 @@
+(function setupVideoController() {
+  const iframe = document.querySelector('iframe');
+  
+  if (!iframe) {
+    console.error('❌ Nenhum iframe encontrado.');
+    return alert('❌ Nenhum iframe encontrado.');
+  }
+
+  const innerDoc = iframe.contentDocument || iframe.contentWindow.document;
+  const videos = innerDoc.querySelectorAll('video');
+  
+  if (!videos.length) {
+    console.error('❌ Nenhum vídeo encontrado dentro do iframe.');
+    return alert('❌ Nenhum vídeo encontrado dentro do iframe.');
+  }
+
+  // 🔧 Cria o painel com estilo glass elegante
+  const panel = innerDoc.createElement('div');
+  panel.id = 'neuroSpeedPanel';
+  
+  // Aplica estilo glass inline inicial
+  panel.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 999999;
+    width: 300px;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    border-radius: 20px;
+    
+    /* Glass effect - efeito de vidro fosco com fundo preto */
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(25px) saturate(200%);
+    -webkit-backdrop-filter: blur(25px) saturate(200%);
+    
+    /* Borda elegante */
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    
+    /* Sombra multicamada para profundidade */
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+      0 0 100px rgba(0, 255, 0, 0.3),
+      0 4px 16px rgba(0, 0, 0, 0.2);
+    
+    /* Transições suaves */
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Cor do texto */
+    color: rgba(255, 255, 255, 0.95);
+  `;
+
+  // 🎥 Título do painel
+  const title = innerDoc.createElement('h3');
+  title.textContent = '⚡ Controle de Vídeo';
+  title.style.cssText = `
+    margin: 0 0 15px 0;
+    padding: 0;
+    font-size: 18px;
+    font-weight: 600;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 10px;
+  `;
+  panel.appendChild(title);
+
+  // 🎬 Lista de vídeos detectados
+  const selectLabel = innerDoc.createElement('label');
+  selectLabel.textContent = 'Selecione o vídeo:';
+  selectLabel.style.cssText = `
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+  `;
+  panel.appendChild(selectLabel);
+
+  const select = innerDoc.createElement('select');
+  select.id = 'videoSelect';
+  select.style.cssText = `
+    width: 100%;
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+  `;
+  
+  select.onfocus = () => {
+    select.style.background = 'rgba(255, 255, 255, 0.15)';
+    select.style.borderColor = 'rgba(0, 255, 0, 0.5)';
+    select.style.boxShadow = '0 0 15px rgba(0, 255, 0, 0.3)';
+  };
+  
+  select.onblur = () => {
+    select.style.background = 'rgba(255, 255, 255, 0.1)';
+    select.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+    select.style.boxShadow = 'none';
+  };
+  
+  select.onmouseenter = () => {
+    select.style.background = 'rgba(255, 255, 255, 0.12)';
+  };
+  
+  select.onmouseleave = () => {
+    if (document.activeElement !== select) {
+      select.style.background = 'rgba(255, 255, 255, 0.1)';
+    }
+  };
+
+  videos.forEach((v, i) => {
+    const opt = innerDoc.createElement('option');
+    opt.value = i;
+    
+    // Informações adicionais sobre o vídeo (apenas ID para não poluir)
+    let info = '';
+    if (v.id) info += ` (${v.id})`;
+    
+    // Verifica se é cross-origin (sem logar para evitar flood)
+    try {
+      const videoUrl = v.src || v.currentSrc;
+      if (videoUrl) {
+        const iframeWindow = iframe.contentWindow;
+        const iframeOrigin = iframeWindow.location.origin;
+        const urlObj = new URL(videoUrl, iframeWindow.location.href);
+        const isCrossOrigin = urlObj.origin !== iframeOrigin;
+        if (isCrossOrigin && !v.crossOrigin) {
+          info += ' [⚠️ CORS]'; // Aviso visual de cross-origin
+        }
+      }
+    } catch (e) {
+      // Ignora erros silenciosamente
+    }
+    
+    opt.textContent = `🎬 Vídeo ${i + 1}${info}`;
+    select.appendChild(opt);
+  });
+  panel.appendChild(select);
+  
+  // Log apenas quando o vídeo selecionado muda (não em loops)
+  select.addEventListener('change', () => {
+    const v = getVideo(false);
+    if (v) {
+      console.log('🔄 Vídeo selecionado:', v.id);
+    }
+  });
+  
+  // Log inicial apenas uma vez
+  console.log(`✅ ${videos.length} vídeo(s) detectado(s) e adicionados ao seletor`);
+
+  // ⚡ Botões de controle
+  const controlsLabel = innerDoc.createElement('label');
+  controlsLabel.textContent = 'Controles:';
+  controlsLabel.style.cssText = `
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+  `;
+  panel.appendChild(controlsLabel);
+
+  const controls = innerDoc.createElement('div');
+  controls.id = 'videoControls';
+  controls.style.cssText = `
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 15px;
+  `;
+  
+  controls.innerHTML = `
+    <button data-action="start">⏮️ Início</button>
+    <button data-action="toggle">⏯️ Play/Pause</button>
+    <button data-action="end">⏭️ Final</button>
+    <button data-action="speed-1">1x</button>
+    <button data-action="speed-1.5">1.5x</button>
+    <button data-action="speed-2">2x</button>
+  `;
+
+  // Estiliza botões com glass effect
+  [...controls.querySelectorAll('button')].forEach(btn => {
+    btn.style.cssText = `
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 10px;
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.25) 0%, 
+        rgba(255, 255, 255, 0.15) 100%);
+      backdrop-filter: blur(15px) saturate(180%);
+      -webkit-backdrop-filter: blur(15px) saturate(180%);
+      color: rgba(255, 255, 255, 0.95);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    `;
+    
+    btn.onmouseenter = () => {
+      btn.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.25) 100%)';
+      btn.style.transform = 'scale(1.08) translateY(-2px)';
+      btn.style.boxShadow = `
+        0 6px 16px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        0 0 20px rgba(0, 255, 0, 0.4)
+      `;
+      btn.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+    };
+    
+    btn.onmouseleave = () => {
+      btn.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)';
+      btn.style.transform = 'scale(1) translateY(0)';
+      btn.style.boxShadow = `
+        0 4px 12px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset
+      `;
+      btn.style.borderColor = 'rgba(255, 255, 255, 0.35)';
+    };
+    
+    btn.onmousedown = () => {
+      btn.style.transform = 'scale(1.05) translateY(0)';
+    };
+    
+    btn.onmouseup = () => {
+      btn.style.transform = 'scale(1.08) translateY(-2px)';
+    };
+  });
+
+  panel.appendChild(controls);
+
+  // 📥 Seção de Download
+  const downloadLabel = innerDoc.createElement('label');
+  downloadLabel.textContent = 'Download:';
+  downloadLabel.style.cssText = `
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+  `;
+  panel.appendChild(downloadLabel);
+
+  const downloadControls = innerDoc.createElement('div');
+  downloadControls.id = 'downloadControls';
+  downloadControls.style.cssText = `
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 15px;
+  `;
+  
+  // Botão Download MP4
+  const btnDownloadMP4 = innerDoc.createElement('button');
+  btnDownloadMP4.id = 'btnDownloadMP4';
+  btnDownloadMP4.textContent = '📥 Download MP4';
+  btnDownloadMP4.setAttribute('data-action', 'download-mp4');
+  btnDownloadMP4.style.cssText = `
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+    background: linear-gradient(135deg, 
+      rgba(255, 255, 255, 0.25) 0%, 
+      rgba(255, 255, 255, 0.15) 100%);
+    backdrop-filter: blur(15px) saturate(180%);
+    -webkit-backdrop-filter: blur(15px) saturate(180%);
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  `;
+  
+  // Botão Download MP3
+  const btnDownloadMP3 = innerDoc.createElement('button');
+  btnDownloadMP3.id = 'btnDownloadMP3';
+  btnDownloadMP3.textContent = '🎵 Download MP3';
+  btnDownloadMP3.setAttribute('data-action', 'download-mp3');
+  btnDownloadMP3.style.cssText = btnDownloadMP4.style.cssText;
+
+  // Estiliza botões de download
+  [btnDownloadMP4, btnDownloadMP3].forEach(btn => {
+    btn.onmouseenter = () => {
+      btn.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.25) 100%)';
+      btn.style.transform = 'scale(1.08) translateY(-2px)';
+      btn.style.boxShadow = `
+        0 6px 16px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        0 0 20px rgba(0, 255, 0, 0.4)
+      `;
+      btn.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+    };
+    
+    btn.onmouseleave = () => {
+      btn.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)';
+      btn.style.transform = 'scale(1) translateY(0)';
+      btn.style.boxShadow = `
+        0 4px 12px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset
+      `;
+      btn.style.borderColor = 'rgba(255, 255, 255, 0.35)';
+    };
+    
+    btn.onmousedown = () => {
+      btn.style.transform = 'scale(1.05) translateY(0)';
+    };
+    
+    btn.onmouseup = () => {
+      btn.style.transform = 'scale(1.08) translateY(-2px)';
+    };
+  });
+
+  downloadControls.appendChild(btnDownloadMP4);
+  downloadControls.appendChild(btnDownloadMP3);
+  panel.appendChild(downloadControls);
+
+  // Status de download
+  const downloadStatus = innerDoc.createElement('div');
+  downloadStatus.id = 'downloadStatus';
+  downloadStatus.style.cssText = `
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    min-height: 20px;
+    display: none;
+  `;
+  panel.appendChild(downloadStatus);
+
+  // 📊 Informações do vídeo
+  const info = innerDoc.createElement('div');
+  info.id = 'videoInfo';
+  info.style.cssText = `
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    line-height: 1.6;
+  `;
+  panel.appendChild(info);
+
+  // 📦 Adiciona o painel ao body do iframe
+  innerDoc.body.appendChild(panel);
+
+  // 🎛️ Funções de controle (definidas antes para uso no detector de cor)
+  let lastVideoLogTime = 0;
+  const getVideo = (logDetails = false) => {
+    const index = parseInt(select.value);
+    const video = videos[index] || null;
+    
+    // Log apenas quando solicitado explicitamente (para evitar flood)
+    if (logDetails) {
+      const now = Date.now();
+      // Throttle: log apenas uma vez a cada 2 segundos
+      if (now - lastVideoLogTime > 2000) {
+        console.log('📹 getVideo chamado:');
+        console.log('  - Índice selecionado:', index);
+        console.log('  - Total de vídeos:', videos.length);
+        console.log('  - Vídeo encontrado:', video);
+        if (video) {
+          console.log('  - ID do vídeo:', video.id);
+          console.log('  - SRC:', video.src || video.currentSrc);
+          console.log('  - CrossOrigin:', video.crossOrigin);
+        }
+        lastVideoLogTime = now;
+      }
+    }
+    
+    return video;
+  };
+
+  // 🎨 Sistema de detecção de cor REMOVIDO - usando fundo preto fixo com glass effect
+  // Todas as funções de detecção de cor foram removidas para simplificar o código
+
+  // Throttle para updateInfo (evita atualizações excessivas)
+  let lastUpdateInfoTime = 0;
+  const updateInfo = () => {
+    const now = Date.now();
+    // Throttle: atualiza no máximo uma vez a cada 300ms
+    if (now - lastUpdateInfoTime < 300) {
+      return;
+    }
+    lastUpdateInfoTime = now;
+    
+    const v = getVideo(false); // Não logar para evitar flood
+    if (!v) return;
+    
+    const current = formatTime(v.currentTime);
+    const duration = formatTime(v.duration);
+    const speed = v.playbackRate;
+    const status = v.paused ? '⏸️ Pausado' : '▶️ Reproduzindo';
+    
+    info.innerHTML = `
+      <div><strong>Status:</strong> ${status}</div>
+      <div><strong>Velocidade:</strong> ${speed}x</div>
+      <div><strong>Tempo:</strong> ${current} / ${duration}</div>
+    `;
+  };
+
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // 📥 Funções de Download
+  const showDownloadStatus = (message, type = 'info') => {
+    downloadStatus.style.display = 'block';
+    downloadStatus.textContent = message;
+    
+    const colors = {
+      info: 'rgba(0, 150, 255, 0.3)',
+      success: 'rgba(0, 255, 0, 0.3)',
+      error: 'rgba(255, 0, 0, 0.3)',
+      progress: 'rgba(255, 165, 0, 0.3)'
+    };
+    
+    downloadStatus.style.background = colors[type] || colors.info;
+    
+    if (type === 'success') {
+      setTimeout(() => {
+        downloadStatus.style.display = 'none';
+      }, 3000);
+    }
+  };
+
+  const hideDownloadStatus = () => {
+    downloadStatus.style.display = 'none';
+  };
+
+  // Converte blob para formato específico usando MediaRecorder API
+  const convertToMP4 = async (videoBlob) => {
+    try {
+      // Se já for MP4, retorna como está
+      if (videoBlob.type.includes('mp4')) {
+        return videoBlob;
+      }
+      
+      // Para conversão real, precisaríamos de ffmpeg.wasm
+      // Por enquanto, retorna o blob original com extensão .mp4
+      return new Blob([videoBlob], { type: 'video/mp4' });
+    } catch (e) {
+      console.error('Erro ao converter para MP4:', e);
+      throw e;
+    }
+  };
+
+
+  // Converte AudioBuffer para WAV
+  const audioBufferToWav = (buffer) => {
+    const length = buffer.length;
+    const numberOfChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+    const view = new DataView(arrayBuffer);
+    
+    // WAV header
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+    view.setUint16(32, numberOfChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, length * numberOfChannels * 2, true);
+    
+    // Audio data
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+      }
+    }
+    
+    return arrayBuffer;
+  };
+
+  // Baixa vídeo como MP4
+  const downloadAsMP4 = async () => {
+    try {
+      const v = getVideo(true); // Log apenas quando iniciar download
+      if (!v) {
+        showDownloadStatus('❌ Vídeo não encontrado!', 'error');
+        return;
+      }
+
+      console.log('🎬 Iniciando download MP4');
+      console.log('🎬 ID do vídeo:', v.id);
+      console.log('🎬 SRC:', (v.src || v.currentSrc)?.substring(0, 50) + '...');
+      console.log('🎬 CrossOrigin:', v.crossOrigin);
+      
+      // Verifica se o vídeo é cross-origin antes de tentar
+      const videoUrl = v.src || v.currentSrc;
+      let isCrossOrigin = false;
+      if (videoUrl) {
+        try {
+          const iframeWindow = iframe.contentWindow;
+          const iframeOrigin = iframeWindow.location.origin;
+          const urlObj = new URL(videoUrl, iframeWindow.location.href);
+          isCrossOrigin = urlObj.origin !== iframeOrigin;
+          
+          if (isCrossOrigin && !v.crossOrigin) {
+            console.warn('⚠️ Vídeo cross-origin detectado. captureStream() não funcionará.');
+            // Pula direto para método alternativo se sabemos que vai falhar
+            showDownloadStatus('⚠️ Vídeo cross-origin. Tentando download direto...', 'progress');
+            
+            const a = innerDoc.createElement('a');
+            a.href = videoUrl;
+            a.download = `video_${Date.now()}.mp4`;
+            a.target = '_blank';
+            a.style.display = 'none';
+            innerDoc.body.appendChild(a);
+            a.click();
+            setTimeout(() => innerDoc.body.removeChild(a), 100);
+            
+            showDownloadStatus('✅ Link de download criado! (Pode falhar se CORS bloquear)', 'info');
+            return;
+          }
+        } catch (urlError) {
+          console.warn('⚠️ Não foi possível verificar origem:', urlError.message);
+        }
+      }
+
+      showDownloadStatus('🔄 Capturando vídeo...', 'progress');
+      
+      // Tenta usar captureStream primeiro
+      let stream = null;
+      try {
+        if (!v.captureStream) {
+          throw new Error('captureStream não suportado neste navegador');
+        }
+        
+        // Tenta definir crossOrigin antes de capturar (pode não funcionar se já carregado)
+        // Nota: crossOrigin só pode ser definido antes de definir src
+        try {
+          if (!v.crossOrigin && (v.src || v.currentSrc)) {
+            console.warn('⚠️ Vídeo já carregado. crossOrigin não pode ser alterado.');
+          } else if (!v.crossOrigin) {
+            v.crossOrigin = 'anonymous';
+            console.log('✅ crossOrigin definido como anonymous');
+          }
+        } catch (crossOriginError) {
+          console.warn('⚠️ Não foi possível definir crossOrigin:', crossOriginError);
+        }
+        
+        stream = v.captureStream();
+        // Log apenas uma vez quando conseguir
+        if (!downloadAsMP4.streamCaptured) {
+          console.log('✅ Stream capturado com sucesso!');
+          downloadAsMP4.streamCaptured = true;
+        }
+      } catch (e) {
+        console.error('❌ Erro ao usar captureStream:', e);
+        console.error('  - Tipo do erro:', e.name);
+        console.error('  - Mensagem:', e.message);
+        
+        // Verifica se é erro de cross-origin (pode estar na mensagem ou no tipo)
+        const isCrossOriginError = e.message && (
+          e.message.includes('cross-origin') || 
+          e.message.includes('cross origin') ||
+          e.message.includes('Cannot capture')
+        ) || e.name === 'SecurityError';
+        
+        if (isCrossOriginError) {
+          showDownloadStatus('⚠️ Vídeo cross-origin detectado. Tentando método alternativo...', 'progress');
+          
+          // Para vídeos cross-origin, não é possível usar captureStream
+          // Tenta criar um link de download direto
+          const videoUrl = v.src || v.currentSrc;
+          if (videoUrl) {
+            console.log('🔗 Tentando download direto da URL:', videoUrl);
+            
+            try {
+              // Cria link de download direto
+              const a = innerDoc.createElement('a');
+              a.href = videoUrl;
+              a.download = `video_${Date.now()}.mp4`;
+              a.target = '_blank';
+              a.style.display = 'none';
+              innerDoc.body.appendChild(a);
+              a.click();
+              
+              setTimeout(() => {
+                innerDoc.body.removeChild(a);
+              }, 100);
+              
+              showDownloadStatus('✅ Link de download criado! Se não funcionar, o servidor está bloqueando por CORS.', 'info');
+              
+              // Informa sobre limitações
+              setTimeout(() => {
+                showDownloadStatus('💡 Dica: Para vídeos cross-origin, use uma extensão de download de vídeo do navegador.', 'info');
+              }, 3000);
+              
+              return;
+            } catch (e2) {
+              console.error('Erro ao baixar diretamente:', e2);
+              throw new Error('Não foi possível baixar o vídeo. Vídeos cross-origin não podem ser capturados devido a restrições de segurança do navegador. Use uma extensão de download de vídeo.');
+            }
+          } else {
+            throw new Error('URL do vídeo não disponível. Vídeos cross-origin não podem ser capturados devido a restrições de segurança.');
+          }
+        } else {
+          throw e;
+        }
+      }
+      
+      // Verifica codecs disponíveis
+      const mimeTypes = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+        'video/mp4'
+      ];
+      
+      let selectedMimeType = 'video/webm';
+      for (const mimeType of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          selectedMimeType = mimeType;
+          break;
+        }
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: selectedMimeType
+      });
+      
+      const chunks = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+          showDownloadStatus(`📥 Gravando... ${chunks.length} chunks`, 'progress');
+        }
+      };
+      
+      return new Promise((resolve, reject) => {
+        mediaRecorder.onstop = async () => {
+          try {
+            if (chunks.length === 0) {
+              throw new Error('Nenhum dado foi gravado');
+            }
+            
+            showDownloadStatus('🔄 Processando vídeo...', 'progress');
+            const blob = new Blob(chunks, { type: selectedMimeType });
+            
+            // Converte para MP4 se necessário
+            const mp4Blob = await convertToMP4(blob);
+            const extension = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+            
+            const url = URL.createObjectURL(mp4Blob);
+            const a = innerDoc.createElement('a');
+            a.href = url;
+            a.download = `video_${Date.now()}.${extension}`;
+            innerDoc.body.appendChild(a); // Necessário para alguns navegadores
+            a.click();
+            innerDoc.body.removeChild(a);
+            
+            URL.revokeObjectURL(url);
+            showDownloadStatus('✅ Download concluído!', 'success');
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
+        };
+        
+        mediaRecorder.onerror = (e) => {
+          reject(new Error('Erro ao gravar: ' + e.error));
+        };
+        
+        // Salva estado do vídeo
+        const currentTime = v.currentTime;
+        const wasPlaying = !v.paused;
+        const playbackRate = v.playbackRate;
+        
+        // Configura para gravação
+        v.currentTime = 0;
+        v.playbackRate = 1;
+        
+        // Inicia gravação
+        mediaRecorder.start(1000); // Coleta dados a cada 1 segundo
+        
+        // Toca o vídeo para capturar
+        v.play().then(() => {
+          showDownloadStatus('▶️ Gravando vídeo...', 'progress');
+          
+          // Para quando o vídeo terminar
+          v.onended = () => {
+            if (mediaRecorder.state === 'recording') {
+              mediaRecorder.stop();
+              // Restaura estado
+              v.currentTime = currentTime;
+              v.playbackRate = playbackRate;
+              if (!wasPlaying) v.pause();
+            }
+          };
+          
+          // Timeout baseado na duração do vídeo
+          const duration = v.duration && !isNaN(v.duration) ? v.duration * 1000 : 60000;
+          const timeout = Math.min(duration, 300000); // Máximo 5 minutos
+          
+          setTimeout(() => {
+            if (mediaRecorder.state === 'recording') {
+              mediaRecorder.stop();
+              // Restaura estado
+              v.currentTime = currentTime;
+              v.playbackRate = playbackRate;
+              if (!wasPlaying) v.pause();
+            }
+          }, timeout);
+        }).catch(reject);
+      });
+      
+    } catch (e) {
+      console.error('Erro ao baixar MP4:', e);
+      showDownloadStatus('❌ Erro ao baixar MP4: ' + e.message, 'error');
+    }
+  };
+
+  // Extrai áudio de um arquivo de vídeo
+  const extractAudioFromFile = async (file, videoPath) => {
+    let videoUrl = null;
+    let tempVideo = null;
+    
+    try {
+      showDownloadStatus('🔄 Carregando arquivo de vídeo...', 'progress');
+      
+      // Cria URL temporária para o arquivo
+      videoUrl = URL.createObjectURL(file);
+      
+      // Carrega o vídeo em um elemento de vídeo
+      tempVideo = innerDoc.createElement('video');
+      tempVideo.src = videoUrl;
+      tempVideo.crossOrigin = 'anonymous';
+      tempVideo.preload = 'auto';
+      tempVideo.style.display = 'none';
+      innerDoc.body.appendChild(tempVideo);
+      
+      // Aguarda o vídeo carregar os metadados
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Timeout ao carregar vídeo'));
+        }, 30000); // 30 segundos timeout
+        
+        tempVideo.onloadedmetadata = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        
+        tempVideo.onerror = (e) => {
+          clearTimeout(timeout);
+          reject(new Error('Erro ao carregar vídeo: ' + (tempVideo.error?.message || 'Erro desconhecido')));
+        };
+        
+        tempVideo.load();
+      });
+      
+      showDownloadStatus('🔄 Extraindo áudio do vídeo...', 'progress');
+      
+      // Método simplificado: usa MediaRecorder para capturar o áudio
+      // Cria um stream a partir do elemento de vídeo
+      let audioStream = null;
+      
+      try {
+        // Tenta usar captureStream (funciona em navegadores modernos)
+        if (tempVideo.captureStream) {
+          const stream = tempVideo.captureStream();
+          const audioTracks = stream.getAudioTracks();
+          
+          if (audioTracks.length > 0) {
+            audioStream = new MediaStream(audioTracks);
+          } else {
+            throw new Error('Vídeo não possui faixa de áudio');
+          }
+        } else {
+          // Fallback: usa Web Audio API
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const source = audioContext.createMediaElementSource(tempVideo);
+          const destination = audioContext.createMediaStreamDestination();
+          source.connect(destination);
+          audioStream = destination.stream;
+        }
+      } catch (streamError) {
+        throw new Error('Não foi possível capturar áudio do vídeo: ' + streamError.message);
+      }
+      
+      // Verifica codecs disponíveis para áudio
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg'
+      ];
+      
+      let selectedMimeType = 'audio/webm';
+      for (const mimeType of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          selectedMimeType = mimeType;
+          break;
+        }
+      }
+      
+      const mediaRecorder = new MediaRecorder(audioStream, {
+        mimeType: selectedMimeType
+      });
+      
+      const audioChunks = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunks.push(e.data);
+          const progress = ((audioChunks.length * 100) / Math.ceil((tempVideo.duration || 60) / 1)).toFixed(0);
+          showDownloadStatus(`🎵 Gravando áudio... ${progress}%`, 'progress');
+        }
+      };
+      
+      // Inicia a gravação com intervalo maior para melhor performance
+      mediaRecorder.start(500); // Coleta dados a cada 500ms (mais frequente para melhor qualidade)
+      
+      // OTIMIZAÇÃO: Acelera a reprodução do vídeo para processar mais rápido
+      // Velocidade de 4x reduz o tempo de processamento de 30min para ~7.5min
+      // Velocidade de 8x reduz para ~3.75min (mas pode ter problemas de qualidade)
+      // Nota: Velocidades muito altas (8x+) podem causar perda de qualidade ou erros
+      let playbackSpeed = 4; // 4x mais rápido (padrão)
+      
+      // Tenta detectar o tamanho do arquivo e ajustar a velocidade
+      // Arquivos menores podem ser processados mais rápido
+      if (file.size) {
+        const fileSizeMB = file.size / 1024 / 1024;
+        if (fileSizeMB < 100) {
+          playbackSpeed = 6; // 6x para arquivos menores
+        } else if (fileSizeMB > 500) {
+          playbackSpeed = 3; // 3x para arquivos muito grandes (mais estável)
+        }
+      }
+      
+      // Limita a velocidade máxima para evitar problemas
+      playbackSpeed = Math.min(playbackSpeed, 8);
+      tempVideo.playbackRate = playbackSpeed;
+      tempVideo.volume = 0;
+      tempVideo.muted = true; // Garante que está mudo
+      
+      // Calcula tempo estimado
+      const originalDuration = tempVideo.duration || 60;
+      const estimatedTime = (originalDuration / playbackSpeed / 60).toFixed(1);
+      showDownloadStatus(`▶️ Processando áudio em ${playbackSpeed}x (estimado: ~${estimatedTime} min)...`, 'progress');
+      
+      await tempVideo.play();
+      
+      // Monitora progresso em tempo real
+      let lastProgressUpdate = 0;
+      const progressInterval = setInterval(() => {
+        if (tempVideo.duration && tempVideo.currentTime) {
+          const progress = Math.min(100, Math.floor((tempVideo.currentTime / tempVideo.duration) * 100));
+          const elapsed = (tempVideo.currentTime / playbackSpeed).toFixed(1);
+          const remaining = ((tempVideo.duration - tempVideo.currentTime) / playbackSpeed).toFixed(1);
+          showDownloadStatus(`🎵 Extraindo áudio... ${progress}% (${elapsed}s / ~${remaining}s restantes)`, 'progress');
+        }
+      }, 500); // Atualiza a cada 500ms
+      
+      // Aguarda o vídeo terminar
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          clearInterval(progressInterval);
+          if (mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+          }
+          reject(new Error('Timeout ao processar áudio'));
+        }, (originalDuration / playbackSpeed) * 1000 + 10000); // Duração acelerada + 10 segundos
+        
+        tempVideo.onended = () => {
+          clearTimeout(timeout);
+          clearInterval(progressInterval);
+          if (mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+          }
+          resolve();
+        };
+        
+        tempVideo.onerror = (e) => {
+          clearTimeout(timeout);
+          clearInterval(progressInterval);
+          if (mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+          }
+          reject(new Error('Erro ao processar vídeo: ' + (tempVideo.error?.message || 'Erro desconhecido')));
+        };
+      });
+      
+      // Para o vídeo e restaura configurações
+      tempVideo.pause();
+      tempVideo.currentTime = 0;
+      tempVideo.playbackRate = 1;
+      tempVideo.volume = 1;
+      tempVideo.muted = false;
+      
+      showDownloadStatus('🔄 Finalizando gravação...', 'progress');
+      
+      // Aguarda a gravação terminar (com timeout maior para arquivos grandes)
+      await new Promise((resolve, reject) => {
+        let resolved = false;
+        
+        mediaRecorder.onstop = () => {
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        };
+        
+        mediaRecorder.onerror = (e) => {
+          if (!resolved) {
+            resolved = true;
+            reject(new Error('Erro ao gravar áudio: ' + e.error));
+          }
+        };
+        
+        // Timeout de segurança maior para arquivos grandes
+        setTimeout(() => {
+          if (!resolved && mediaRecorder.state === 'recording') {
+            resolved = true;
+            mediaRecorder.stop();
+            // Aguarda mais um pouco para o stop processar
+            setTimeout(() => resolve(), 1000);
+          }
+        }, 10000); // 10 segundos para finalizar
+      });
+      
+      if (audioChunks.length === 0) {
+        throw new Error('Nenhum áudio foi gravado');
+      }
+      
+      showDownloadStatus(`🔄 Processando ${audioChunks.length} chunks de áudio...`, 'progress');
+      
+      // OTIMIZAÇÃO: Processa em chunks para não travar a UI
+      // Cria o blob de áudio
+      const audioBlob = new Blob(audioChunks, { type: selectedMimeType });
+      
+      showDownloadStatus('🔄 Convertendo para WAV...', 'progress');
+      
+      // Tenta converter para WAV usando Web Audio API
+      let wavBlob = audioBlob;
+      try {
+        showDownloadStatus('🔄 Decodificando áudio...', 'progress');
+        
+        // Processa a conversão de forma assíncrona para não travar a UI
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        
+        // Usa AudioContext normal (OfflineAudioContext não funciona bem com decodeAudioData)
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Decodifica o áudio (isso pode demorar para arquivos grandes)
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        showDownloadStatus('🔄 Convertendo para WAV...', 'progress');
+        
+        // Processa a conversão em chunks para não bloquear a UI
+        // Usa requestIdleCallback se disponível, senão usa setTimeout
+        const wavArrayBuffer = await new Promise((resolve) => {
+          const convert = () => {
+            try {
+              const wav = audioBufferToWav(audioBuffer);
+              resolve(wav);
+            } catch (e) {
+              throw e;
+            }
+          };
+          
+          // Tenta usar requestIdleCallback para processar quando o navegador estiver ocioso
+          if (window.requestIdleCallback) {
+            requestIdleCallback(convert, { timeout: 1000 });
+          } else {
+            // Fallback: processa no próximo frame
+            setTimeout(convert, 0);
+          }
+        });
+        
+        wavBlob = new Blob([wavArrayBuffer], { type: 'audio/wav' });
+        showDownloadStatus('✅ Áudio convertido para WAV!', 'success');
+      } catch (convertError) {
+        console.warn('Não foi possível converter para WAV, mantendo formato original:', convertError);
+        showDownloadStatus('⚠️ Mantendo formato original (conversão WAV falhou)', 'info');
+        // Mantém o formato original
+      }
+      
+      // Pega o nome do arquivo sem extensão
+      const videoFileName = file.name.replace(/\.[^/.]+$/, '');
+      const isWav = wavBlob.type.includes('wav');
+      const audioFileName = `${videoFileName}.${isWav ? 'wav' : 'mp3'}`;
+      const fileExtension = isWav ? 'wav' : (selectedMimeType.includes('mp4') ? 'm4a' : 'webm');
+      
+      // Tenta salvar na mesma pasta do vídeo usando File System Access API
+      if ('showSaveFilePicker' in window) {
+        try {
+          // Tenta abrir o seletor de arquivo para salvar na mesma pasta
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName: audioFileName,
+            types: [{
+              description: `Arquivo de áudio ${fileExtension.toUpperCase()}`,
+              accept: { [`audio/${fileExtension}`]: [`.${fileExtension}`] }
+            }]
+          });
+          
+          // Salva o arquivo
+          const writable = await fileHandle.createWritable();
+          await writable.write(wavBlob);
+          await writable.close();
+          
+          showDownloadStatus('✅ Áudio extraído e salvo com sucesso na mesma pasta do vídeo!', 'success');
+          
+          // Limpa recursos
+          if (tempVideo && tempVideo.parentNode) {
+            innerDoc.body.removeChild(tempVideo);
+          }
+          if (videoUrl) {
+            URL.revokeObjectURL(videoUrl);
+          }
+          
+          return;
+        } catch (saveError) {
+          if (saveError.name === 'AbortError') {
+            showDownloadStatus('⚠️ Operação cancelada pelo usuário', 'info');
+            if (tempVideo && tempVideo.parentNode) {
+              innerDoc.body.removeChild(tempVideo);
+            }
+            if (videoUrl) {
+              URL.revokeObjectURL(videoUrl);
+            }
+            return;
+          }
+          console.warn('Não foi possível usar File System Access API:', saveError);
+          // Continua com o método de download tradicional
+        }
+      }
+      
+      // Método alternativo: faz download do arquivo
+      const audioUrl = URL.createObjectURL(wavBlob);
+      const a = innerDoc.createElement('a');
+      a.href = audioUrl;
+      a.download = `${videoFileName}.${fileExtension}`;
+      
+      innerDoc.body.appendChild(a);
+      a.click();
+      innerDoc.body.removeChild(a);
+      
+      URL.revokeObjectURL(audioUrl);
+      
+      showDownloadStatus(`✅ Áudio extraído! O arquivo será baixado na pasta de downloads.`, 'success');
+      
+      // Limpa recursos
+      if (tempVideo) {
+        innerDoc.body.removeChild(tempVideo);
+      }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+      
+    } catch (e) {
+      console.error('Erro ao extrair áudio:', e);
+      showDownloadStatus('❌ Erro ao extrair áudio: ' + e.message, 'error');
+      
+      // Limpa recursos em caso de erro
+      if (tempVideo && tempVideo.parentNode) {
+        innerDoc.body.removeChild(tempVideo);
+      }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+      
+      throw e;
+    }
+  };
+
+  // Baixa vídeo como MP3 (novo método: primeiro baixa o vídeo, depois extrai o áudio)
+  const downloadAsMP3 = async () => {
+    try {
+      // Primeiro, solicita que o usuário baixe o vídeo
+      showDownloadStatus('📥 Primeiro, baixe o vídeo usando o botão "Download MP4"', 'info');
+      showDownloadStatus('⚡ Dica: O processamento será acelerado (4x) para ser mais rápido!', 'info');
+      
+      // Aguarda um pouco para o usuário ler a mensagem
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      // Cria um input file para selecionar o vídeo baixado
+      const fileInput = innerDoc.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'video/*';
+      fileInput.style.display = 'none';
+      
+      // Adiciona o input ao body
+      innerDoc.body.appendChild(fileInput);
+      
+      showDownloadStatus('📂 Selecione o arquivo de vídeo que você baixou...', 'progress');
+      
+      // Aguarda o usuário selecionar o arquivo
+      const file = await new Promise((resolve, reject) => {
+        fileInput.onchange = (e) => {
+          const selectedFile = e.target.files[0];
+          if (selectedFile) {
+            resolve(selectedFile);
+          } else {
+            reject(new Error('Nenhum arquivo selecionado'));
+          }
+        };
+        
+        fileInput.oncancel = () => {
+          reject(new Error('Seleção de arquivo cancelada'));
+        };
+        
+        // Clique no input
+        fileInput.click();
+      });
+      
+      // Remove o input
+      innerDoc.body.removeChild(fileInput);
+      
+      // Verifica se é um arquivo de vídeo
+      if (!file.type.startsWith('video/')) {
+        throw new Error('O arquivo selecionado não é um vídeo válido');
+      }
+      
+      console.log('🎵 Arquivo selecionado:', file.name, 'Tamanho:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      
+      // Extrai o áudio do arquivo
+      await extractAudioFromFile(file, file.name);
+      
+    } catch (e) {
+      if (e.message === 'Seleção de arquivo cancelada') {
+        showDownloadStatus('⚠️ Operação cancelada', 'info');
+        return;
+      }
+      console.error('Erro ao processar MP3:', e);
+      showDownloadStatus('❌ Erro: ' + e.message, 'error');
+    }
+  };
+
+  // Event listeners para os botões de controle
+  controls.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = getVideo();
+      if (!v) {
+        alert('❌ Vídeo não encontrado!');
+        return;
+      }
+
+      const action = btn.getAttribute('data-action');
+      
+      switch (action) {
+        case 'start':
+          v.currentTime = 0;
+          break;
+        case 'end':
+          v.currentTime = v.duration - 0.1;
+          break;
+        case 'toggle':
+          v.paused ? v.play() : v.pause();
+          break;
+        case 'speed-1':
+          v.playbackRate = 1;
+          break;
+        case 'speed-1.5':
+          v.playbackRate = 1.5;
+          break;
+        case 'speed-2':
+          v.playbackRate = 2;
+          break;
+      }
+      
+      updateInfo();
+    });
+  });
+
+  // Event listeners para os botões de download
+  btnDownloadMP4.addEventListener('click', downloadAsMP4);
+  btnDownloadMP3.addEventListener('click', downloadAsMP3);
+
+  // Atualiza informações periodicamente (com intervalo maior para reduzir carga)
+  const updateInterval = setInterval(() => {
+    const v = getVideo(false); // Não logar para evitar flood
+    if (v && !v.paused) {
+      updateInfo();
+    }
+  }, 1000); // Aumentado para 1 segundo
+
+  // Atualiza quando o vídeo muda
+  select.addEventListener('change', () => {
+    updateInfo();
+  });
+
+  // Atualiza quando o vídeo toca/pausa (com throttling para evitar flood)
+  videos.forEach(v => {
+    let lastUpdateTime = 0;
+    
+    v.addEventListener('play', () => {
+      updateInfo();
+    });
+    
+    v.addEventListener('pause', () => {
+      updateInfo();
+    });
+    
+    // timeupdate dispara muito frequentemente, então usa throttle
+    v.addEventListener('timeupdate', () => {
+      const now = Date.now();
+      // Atualiza no máximo uma vez a cada 500ms
+      if (now - lastUpdateTime > 500) {
+        updateInfo();
+        lastUpdateTime = now;
+      }
+    });
+  });
+
+  // Efeito hover no painel (fundo preto com glass effect)
+  panel.onmouseenter = () => {
+    panel.style.background = 'rgba(0, 0, 0, 0.4)';
+    panel.style.boxShadow = `
+      0 12px 48px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.25) inset,
+      0 0 120px rgba(0, 255, 0, 0.5),
+      0 6px 20px rgba(0, 0, 0, 0.3)
+    `;
+    panel.style.transform = 'translateY(-3px) scale(1.01)';
+    panel.style.borderColor = 'rgba(255, 255, 255, 0.35)';
+  };
+  
+  panel.onmouseleave = () => {
+    panel.style.background = 'rgba(0, 0, 0, 0.3)';
+    panel.style.boxShadow = `
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+      0 0 100px rgba(0, 255, 0, 0.3),
+      0 4px 16px rgba(0, 0, 0, 0.2)
+    `;
+    panel.style.transform = 'translateY(0) scale(1)';
+    panel.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+  };
+
+  // Inicializa informações
+  updateInfo();
+
+  console.log(`✅ Painel de controle criado! ${videos.length} vídeo(s) detectado(s).`);
+  console.log('🎨 Estilo glass aplicado com sucesso!');
+})();
+

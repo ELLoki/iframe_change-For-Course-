@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "DuckChange Injector",
+  "version": "1.0.2",
+  "description": "Injeta script de controle de velocidade",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://plugadosead.fiqueligadonews.com.br/*",
+    "https://raw.githubusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "NeuroSpeed - Clique para ativar"
+  }
+}
